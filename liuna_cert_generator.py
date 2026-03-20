@@ -1,3 +1,4 @@
+pip install 
 pypdf
 """
 LIUNA Certificate Generator
