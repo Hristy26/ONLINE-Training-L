@@ -1,3 +1,4 @@
+pypdf
 """
 liuna_cert_generator.py — LIUNA Completion Certificate Generator
 ================================================================
