@@ -1,3 +1,4 @@
+pypdf
 """
 LIUNA Certificate Generator
 ============================
