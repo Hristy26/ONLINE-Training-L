@@ -73,16 +73,11 @@ WHITE      = colors.white
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
-def to_upper(s: str) -> str:
-    return s.upper()
-
-
 def fmt_date(raw: str) -> str:
-    """Convert various date formats to 'MONTH DD, YYYY'."""
     if not raw:
         return ""
     cleaned = re.sub(r"^[A-Za-z]+,\s*", "", raw.strip())
-    for fmt in ("%B %d, %Y", "%m/%d/%Y", "%Y-%m-%d"):
+    for fmt in ("%B %d, %Y", "%m/%d/%Y", "%Y-%m-%d", "%Y-%m-%d %H:%M:%S"):
         try:
             return datetime.strptime(cleaned, fmt).strftime("%B %d, %Y").upper()
         except ValueError:
@@ -103,8 +98,22 @@ def safe_filename(name: str, member_id: str) -> str:
 
 
 def online_hours(class_name: str) -> str:
-    """Return '4.00' for awareness classes, '2.00' for everything else."""
     return "4.00" if class_name.lower() in ONLINE_4HR_CLASSES else "2.00"
+
+
+def wrap_text(c, text: str, font: str, size: float, max_width: float) -> list:
+    words = text.split()
+    lines, line = [], ""
+    for word in words:
+        test = f"{line} {word}".strip()
+        if c.stringWidth(test, font, size) > max_width and line:
+            lines.append(line)
+            line = word
+        else:
+            line = test
+    if line:
+        lines.append(line)
+    return lines
 
 
 # ── CSV loading ──────────────────────────────────────────────────────────────
@@ -125,9 +134,9 @@ def load_csv(filepath: str) -> dict:
             if not mid:
                 continue
 
-            name  = get_name(row)
-            cls   = row[COL_CLASS_NAME].strip()
-            date  = row[COL_DATE_END].strip()
+            name = get_name(row)
+            cls  = row[COL_CLASS_NAME].strip()
+            date = row[COL_DATE_END].strip()
 
             groups[mid]["name"] = name
             groups[mid]["mid"]  = mid
@@ -143,76 +152,57 @@ def load_csv(filepath: str) -> dict:
 
 # ── Certificate drawing ──────────────────────────────────────────────────────
 
-def wrap_text(c, text: str, font: str, size: float, max_width: float) -> list:
-    """Word-wrap text to fit within max_width. Returns list of lines."""
-    words = text.split()
-    lines, line = [], ""
-    for word in words:
-        test = f"{line} {word}".strip()
-        if c.stringWidth(test, font, size) > max_width and line:
-            lines.append(line)
-            line = word
-        else:
-            line = test
-    if line:
-        lines.append(line)
-    return lines
-
-
 def draw_cert(c: rl_canvas.Canvas,
               name: str, cls: str, date: str, member_id: str,
               dir_name: str, dir_title: str,
               org_name: str, org_addr: str, org_city: str, org_phone: str):
-    """Draw one certificate page onto canvas c."""
 
     W, H = PAGE_W, PAGE_H
     cx   = W / 2
 
-    # ── Background ───────────────────────────────────────────────────────────
+    # Background
     c.setFillColor(WHITE)
     c.rect(0, 0, W, H, fill=1, stroke=0)
 
-    # ── Double border ────────────────────────────────────────────────────────
+    # Double border
     c.setStrokeColor(BLACK)
     c.setLineWidth(2.5)
     c.rect(14, 14, W - 28, H - 28, fill=0, stroke=1)
     c.setLineWidth(0.75)
     c.rect(23, 23, W - 46, H - 46, fill=0, stroke=1)
 
-    # ── Organization title — 28pt bold ───────────────────────────────────────
+    # Org title — 32pt bold
     c.setFillColor(BLACK)
-    c.setFont("Times-Bold", 28)
+    c.setFont("Times-Bold", 32)
     c.drawCentredString(cx, H - 60, (org_name or "LIUNA Training of Michigan").upper())
 
-    # ── Address block — 11pt ─────────────────────────────────────────────────
+    # Address block — 11pt
     c.setFont("Helvetica", 11)
     c.setFillColor(DARK_GRAY)
     c.drawCentredString(cx, H - 80, (org_addr or "").upper())
     c.drawCentredString(cx, H - 94, (org_city or "").upper())
     c.drawCentredString(cx, H - 108, org_phone or "")
 
-    # ── Centered content block ───────────────────────────────────────────────
-    # Vertically center the block from y=148 to y=380 (approx)
-    # DECLARES THAT
+    # DECLARES THAT — 13pt italic
     c.setFont("Times-Italic", 13)
     c.setFillColor(LIGHT_GRAY)
-    c.drawCentredString(cx, H - 148, "DECLARES THAT")
+    c.drawCentredString(cx, H - 150, "DECLARES THAT")
 
-    # Student name — 26pt bold (smaller than 28pt title)
+    # Student name — 26pt bold
     c.setFont("Times-Bold", 26)
     c.setFillColor(BLACK)
     c.drawCentredString(cx, H - 190, name or "STUDENT NAME")
 
-    # Date line — 13pt
+    # Date — 13pt
     c.setFont("Helvetica", 13)
     c.setFillColor(DARK_GRAY)
     c.drawCentredString(cx, H - 220, f"ON {fmt_date(date)}")
 
-    # Hours line — 13pt (uses online_hours logic)
+    # Hours — 13pt
     hrs = online_hours(cls)
     c.drawCentredString(cx, H - 244, f"COMPLETED {hrs} HOURS OF")
 
-    # Class name — 22pt bold (prominent, between name and "ONLINE TRAINING")
+    # Class name — 22pt bold
     c.setFont("Times-Bold", 22)
     c.setFillColor(BLACK)
     c.drawCentredString(cx, H - 278, cls.upper())
@@ -222,12 +212,12 @@ def draw_cert(c: rl_canvas.Canvas,
     c.setFillColor(DARK_GRAY)
     c.drawCentredString(cx, H - 306, "ONLINE TRAINING")
 
-    # ── Light rule ───────────────────────────────────────────────────────────
+    # Light rule
     c.setStrokeColor(RULE_GRAY)
     c.setLineWidth(0.75)
-    c.line(55, H - 326, W - 55, H - 326)
+    c.line(55, H - 323, W - 55, H - 323)
 
-    # ── Disclosure — 11pt italic Georgia, matches Erick Bassett cert ─────────
+    # Disclosure — 11pt italic, word-wrapped
     disclosure = (
         f"The {org_name or 'LIUNA Training of Michigan'} is not, and should not be construed as, "
         "a substitute for an employer's obligation under OSHA or EPA to provide employees with "
@@ -235,39 +225,36 @@ def draw_cert(c: rl_canvas.Canvas,
         "equipment and machinery with which the employee will be working while in the contractor's employment."
     )
     disc_lines = wrap_text(c, disclosure, "Times-Italic", 11, W - 140)
-    disc_start = H - 368
     c.setFont("Times-Italic", 11)
     c.setFillColor(MID_GRAY)
+    disc_start = H - 350
     for i, ln in enumerate(disc_lines):
         c.drawCentredString(cx, disc_start - i * 15, ln)
 
-    # ── Director — bottom right, 16pt italic script style, raised 2x ─────────
-    dir_y = 90
+    # Director — bottom right, 16pt italic
     c.setFont("Times-Italic", 16)
     c.setFillColor(BLACK)
-    c.drawCentredString(W - 200, dir_y + 20, dir_name or "Director")
+    c.drawCentredString(W - 200, 110, dir_name or "Director")
 
     c.setStrokeColor(BLACK)
     c.setLineWidth(0.75)
-    c.line(W - 330, dir_y, W - 70, dir_y)
+    c.line(W - 330, 90, W - 70, 90)
 
     c.setFont("Helvetica", 11)
     c.setFillColor(DARK_GRAY)
-    c.drawString(W - 330, dir_y - 15, (dir_title or "DIRECTOR").upper())
+    c.drawString(W - 330, 75, (dir_title or "DIRECTOR").upper())
 
-    # ── EasyGenerator logo — bottom left, same size as old "STUDENT NUMBER" ──
-    logo_cx = 100
-    logo_cy = 70
+    # EasyGenerator logo — bottom left
     c.setFillColor(colors.HexColor("#F26522"))
-    c.ellipse(logo_cx - 20, logo_cy - 16, logo_cx + 20, logo_cy + 16, fill=1, stroke=0)
+    c.ellipse(60, 54, 100, 86, fill=1, stroke=0)
     c.setFillColor(WHITE)
     c.setFont("Helvetica-Bold", 9)
-    c.drawCentredString(logo_cx, logo_cy + 3, "easy")
+    c.drawCentredString(80, 73, "easy")
     c.setFont("Helvetica", 8)
-    c.drawCentredString(logo_cx, logo_cy - 7, "gen")
+    c.drawCentredString(80, 62, "gen")
     c.setFillColor(LIGHT_GRAY)
     c.setFont("Helvetica", 10)
-    c.drawString(logo_cx + 24, logo_cy - 4, "easygenerator")
+    c.drawString(106, 66, "easygenerator")
 
 
 # ── PDF generation ───────────────────────────────────────────────────────────
